@@ -10,7 +10,7 @@ The model analyzes DNA sequences, identifies abnormal repeat patterns, and class
 - To build a computational model capable of **detecting abnormal CAG expansions** in the HTT gene.  
 - To leverage **Deep Learning** for early risk prediction of Huntington’s Disease.  
 - To evaluate the model using **accuracy, precision, and AUC**.  
-- To provide a framework for **genomic-based clinical decision support**.  
+- To provide a framework for **genomic-based clinical decision support**.
 
 ---
 
