@@ -47,3 +47,9 @@ The DNN is based on a **1D Convolutional Neural Network (CNN)**:
   - **AUC**: Distinguishing power between classes.  
 
 ---
+
+## ⭐ Give a Star!  
+If you like this project, feel free to ⭐ the repo.  
+Your support motivates me to build more projects!
+
+
