@@ -1,0 +1,91 @@
+import streamlit as st
+import torch
+import re
+import numpy as np
+from PIL import Image
+import torchvision.transforms as transforms
+from vit_model import ViTClassifier
+from dna_model import DNANet
+
+CLASS_NAMES = ["Normal", "Intermediate", "Pathogenic", "Unknown"]
+CONF_THRESHOLD = 0.7  # 70% confidence required
+
+# ===== Device =====
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# ===== MRI preprocessing (match training) =====
+mri_transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5, 0.5, 0.5],
+                         std=[0.5, 0.5, 0.5]),
+])
+
+# ===== DNA preprocessing (match training) =====
+def clean_dna(seq: str) -> str:
+    return re.sub(r'[^ATCG]', '', seq.upper())
+
+def dna_to_features(seq: str, dim: int = 1000) -> torch.Tensor:
+    features = np.zeros(dim, dtype=np.float32)
+    features[0] = len(re.findall(r'(?:CAG)+', seq))
+    return torch.tensor(features, dtype=torch.float32).unsqueeze(0)
+
+# ===== Load models =====
+@st.cache_resource
+def load_models():
+    mri = ViTClassifier(num_classes=3).to(device)
+    mri.load_state_dict(torch.load(r"P:\HD_ViT_Project\models\mri_model.pth", map_location=device))
+    mri.eval()
+
+    dna = DNANet(input_dim=1000, num_classes=3).to(device)
+    dna.load_state_dict(torch.load(r"P:\HD_ViT_Project\models\dna_model.pth", map_location=device))
+    dna.eval()
+    return mri, dna
+
+mri_model, dna_model = load_models()
+
+# ===== UI =====
+st.set_page_config(page_title="Huntington's Disease Detection", layout="wide")
+st.title("🧬 Huntington's Disease Detection System")
+tabs = st.tabs(["🩻 MRI Prediction", "🧬 DNA Prediction"])
+
+# ----- MRI Tab -----
+with tabs[0]:
+    st.header("MRI Image Classification (3 classes)")
+    uploaded = st.file_uploader("Upload MRI Image", type=["png", "jpg", "jpeg"])
+    if uploaded:
+        image = Image.open(uploaded).convert("RGB")
+        st.image(image, caption="Uploaded MRI", use_container_width=True)
+
+        img_tensor = mri_transform(image).unsqueeze(0).to(device)
+        with torch.no_grad():
+            logits = mri_model(img_tensor)
+            probs = torch.softmax(logits, dim=1)[0]
+            pred_idx = int(probs.argmax().item())
+            pred_prob = float(probs[pred_idx].item())
+
+        if pred_prob < CONF_THRESHOLD:
+            st.warning(f"Prediction: **Uncertain** (max confidence: {pred_prob:.2%})")
+        else:
+            st.success(f"Prediction: **{CLASS_NAMES[pred_idx]}** ({pred_prob:.2%})")
+
+# ----- DNA Tab -----
+with tabs[1]:
+    st.header("DNA Sequence Classification (3 classes)")
+    dna_input = st.text_area("Paste raw DNA sequence (A/T/C/G only)")
+    if dna_input:
+        dna_seq = clean_dna(dna_input)
+        if not dna_seq:
+            st.error("Please enter a valid DNA sequence containing only A, T, C, and G.")
+        else:
+            dna_feat = dna_to_features(dna_seq).to(device)
+            with torch.no_grad():
+                logits = dna_model(dna_feat)
+                probs = torch.softmax(logits, dim=1)[0]
+                pred_idx = int(probs.argmax().item())
+                pred_prob = float(probs[pred_idx].item())
+
+            if pred_prob < CONF_THRESHOLD:
+                st.warning(f"Prediction: **Uncertain** (max confidence: {pred_prob:.2%})")
+            else:
+                st.success(f"Prediction: **{CLASS_NAMES[pred_idx]}** ({pred_prob:.2%})")
