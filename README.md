@@ -1,12 +1,12 @@
 # Genetic_Forecasting_of_Huntington_Disease
-## 📖 Overview
+##  Overview
 Huntington’s Disease (HD) is a hereditary neurodegenerative disorder caused by abnormal expansions of **CAG trinucleotide repeats** in the **HTT gene**.  
 This project proposes a **Deep Neural Network (DNN) based forecasting system** that predicts the likelihood of HD using genetic sequence data.  
 The model analyzes DNA sequences, identifies abnormal repeat patterns, and classifies individuals as either **healthy** or **at risk**.
 
 ---
 
-## 🎯 Objectives
+## Objectives
 - To build a computational model capable of **detecting abnormal CAG expansions** in the HTT gene.  
 - To leverage **Deep Learning** for early risk prediction of Huntington’s Disease.  
 - To evaluate the model using **accuracy, precision, and AUC**.  
@@ -14,7 +14,7 @@ The model analyzes DNA sequences, identifies abnormal repeat patterns, and class
 
 ---
 
-## 🧪 Methodology
+## Methodology
 
 ### 1. Data Collection
 - DNA sequences focusing on **CAG repeat regions** of the **HTT gene**.  
