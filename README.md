@@ -35,7 +35,7 @@ The DNN is based on a **1D Convolutional Neural Network (CNN)**:
 - `Sigmoid output` – binary prediction (0: healthy, 1: at-risk).  
 
 ### 4. Training
-- Loss: **Binary Crossentropy**  
+- Loss: **Binary Crossentropy**   
 - Optimizer: **Adam**  
 - Metrics: **Accuracy, Precision, AUC**  
 
