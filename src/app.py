@@ -3,143 +3,378 @@ from PIL import Image
 import re
 import traceback
 
-# Try importing predict safely
-try:
-    from predict_multimodal import predict
-    PREDICT_AVAILABLE = True
-    IMPORT_ERR = None
-except Exception as e:
-    PREDICT_AVAILABLE = False
-    IMPORT_ERR = e
+from predict_multimodal import predict
 
-# ----- Page Config -----
+# =====================================
+# PAGE CONFIG
+# =====================================
+
 st.set_page_config(
-    page_title="Huntington's Disease Detection",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Huntington Disease Detection",
+    page_icon="🧬",
+    layout="wide"
 )
 
-# ----- Sidebar -----
-st.sidebar.title("🔬 HD Detection Controls")
-CONF_THRESHOLD = st.sidebar.slider("Minimum Confidence Threshold", 0.0, 1.0, 0.7, 0.05)
-keep_history = st.sidebar.checkbox("Keep prediction history (this session)", True)
+# =====================================
+# DARK PROFESSIONAL THEME
+# =====================================
 
-with st.sidebar.expander("ℹ️ Tips", expanded=False):
-    st.markdown(
-        "- Upload an axial brain MRI image (PNG/JPG).\n"
-        "- Paste a valid DNA sequence (only A/T/C/G).\n"
-        "- Click **Find Output** to get the combined prediction.\n"
-    )
+st.markdown("""
+<style>
 
-# ----- Header -----
-st.markdown(
-    "<h1 style='text-align:center; color:#4B0082;'>🧬 Huntington's Disease Combined Detection</h1>",
-    unsafe_allow_html=True
+/* Main Background */
+.stApp {
+    background-color: #0f172a;
+    color: white;
+}
+
+/* Container */
+.block-container {
+    padding-top: 2rem;
+    max-width: 1200px;
+}
+
+/* Title */
+h1 {
+    text-align: center;
+    color: #ffffff !important;
+    font-size: 48px !important;
+    font-weight: 800;
+}
+
+/* Headers */
+h2, h3 {
+    color: #60a5fa !important;
+    font-size: 30px !important;
+}
+
+/* All Text */
+p, li, span, label {
+    color: white !important;
+    font-size: 18px !important;
+}
+
+/* Upload Card */
+[data-testid="stFileUploader"] {
+    background: #1e293b;
+    border-radius: 15px;
+    padding: 15px;
+    border: 1px solid #334155;
+}
+
+/* Text Area */
+.stTextArea textarea {
+    background-color: #1e293b !important;
+    color: white !important;
+    border-radius: 12px !important;
+    border: 1px solid #475569 !important;
+    font-size: 18px !important;
+}
+
+/* Predict Button */
+.stButton > button {
+    width: 100%;
+    height: 60px;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(
+        90deg,
+        #2563eb,
+        #3b82f6
+    );
+    color: white;
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.stButton > button:hover {
+    background: linear-gradient(
+        90deg,
+        #1d4ed8,
+        #2563eb
+    );
+}
+
+/* Metric Cards */
+[data-testid="stMetric"] {
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid #334155;
+}
+
+/* Metric Text */
+[data-testid="stMetricLabel"] {
+    color: white !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: #60a5fa !important;
+}
+
+/* Expander */
+details {
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 10px;
+    border: 1px solid #334155;
+}
+
+/* Success */
+.stSuccess {
+    border-radius: 10px;
+}
+
+/* Warning */
+.stWarning {
+    border-radius: 10px;
+}
+
+/* Error */
+.stError {
+    border-radius: 10px;
+}
+
+/* Footer */
+footer {
+    visibility: hidden;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# =====================================
+# HEADER
+# =====================================
+
+st.title("🧬 Huntington Disease Detection System")
+
+st.markdown("""
+### Multimodal  Classification
+
+This system combines:
+
+- 🧬 DNA Analysis
+- 🧠 MRI Analysis
+
+to predict:
+
+- Normal
+- Intermediate
+- Pathogenic
+""")
+
+# =====================================
+# VALIDATION
+# =====================================
+
+DNA_REGEX = re.compile(
+    r"^[ATCG]+$",
+    re.IGNORECASE
 )
 
-# ----- Session History -----
-if "history" not in st.session_state:
-    st.session_state.history = []
+# =====================================
+# MRI UPLOAD
+# =====================================
 
-def add_history(cls: str, prob: float):
-    if keep_history:
-        st.session_state.history.append({"Class": cls, "Confidence": f"{prob:.2%}"})
+st.subheader("🧠 MRI Upload")
 
+uploaded_file = st.file_uploader(
+    "Upload MRI Image",
+    type=["png", "jpg", "jpeg"]
+)
 
-# ----- Helpers -----
-DNA_REGEX = re.compile(r"^[ATCG]+$", re.IGNORECASE)
-def is_valid_dna(seq): return bool(DNA_REGEX.fullmatch((seq or "").strip()))
+image = None
 
-def show_pred_block(cls: str, prob: float):
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        st.markdown("### 🧾 Final Combined Prediction")
-        st.markdown(f"- Class: **{cls}**")
-        st.markdown(f"- Confidence: **{prob:.2%}**")
-    with c2:
-        st.progress(min(1.0, float(prob)))
-    if prob < CONF_THRESHOLD:
-        st.warning("⚠ Low confidence. Result may be uncertain.")
+if uploaded_file is not None:
 
-def safe_predict(dna_text, image_file):
-    if not PREDICT_AVAILABLE:
-        st.error("❌ Could not import prediction module.")
-        if IMPORT_ERR:
-            with st.expander("See error details"):
-                st.code(str(IMPORT_ERR))
-        return None
     try:
-        with st.spinner("Running prediction..."):
-            return predict(dna_text, image_file)
+
+        image = Image.open(uploaded_file)
+
+        st.image(
+            image,
+            width=350,
+            caption="Uploaded MRI Image"
+        )
+
+        st.success(
+            "✅ MRI uploaded successfully"
+        )
+
     except Exception:
-        st.error("❌ Error during prediction.")
-        with st.expander("See error details"):
-            st.code("".join(traceback.format_exc()))
-        return None
 
-# ----- Combine Function -----
-def combine_results(mri_res, dna_res):
-    if not mri_res or not dna_res:
-        return None
-    
-    cls_m, prob_m = mri_res["Class"], float(mri_res["Probability"])
-    cls_d, prob_d = dna_res["Class"], float(dna_res["Probability"])
+        st.error(
+            "❌ Unable to open image"
+        )
 
-    if cls_m == cls_d:
-        final_cls = cls_m
-        final_prob = (prob_m + prob_d) / 2
-    else:
-        if prob_m >= prob_d:
-            final_cls, final_prob = cls_m, prob_m
-        else:
-            final_cls, final_prob = cls_d, prob_d
-    
-    return {"Class": final_cls, "Probability": final_prob}
+# =====================================
+# DNA INPUT
+# =====================================
 
-# ----- Input Section -----
-st.subheader("Upload MRI and Enter DNA Sequence")
+st.subheader("🧬 DNA Sequence")
 
-uploaded = st.file_uploader("Upload MRI Image", type=["png", "jpg", "jpeg"])
-dna_input = st.text_area("Paste DNA sequence (A/T/C/G only)")
+dna_sequence = st.text_area(
+    "Enter DNA Sequence",
+    height=200,
+    placeholder="ATCGATCGATCGATCG..."
+)
 
-img_ok = None
-if uploaded:
+# =====================================
+# PREDICTION
+# =====================================
+
+if st.button("🔍 Predict"):
+
+    if uploaded_file is None:
+
+        st.warning(
+            "⚠ Please upload MRI image."
+        )
+
+        st.stop()
+
+    if not dna_sequence.strip():
+
+        st.warning(
+            "⚠ Please enter DNA sequence."
+        )
+
+        st.stop()
+
+    if not DNA_REGEX.fullmatch(
+        dna_sequence.strip()
+    ):
+
+        st.error(
+            "❌ Only A, T, C and G are allowed."
+        )
+
+        st.stop()
+
     try:
-        img_ok = Image.open(uploaded).convert("RGB")
-        st.image(img_ok, caption="Uploaded MRI", use_container_width=True)
-    except Exception as e:
-        st.error(f"❌ Unable to open image. Error: {e}")
-        img_ok = None
 
-# ----- Find Output Button -----
-if st.button("🔍 Find Output"):
-    if uploaded and dna_input:
-        if not is_valid_dna(dna_input):
-            st.error("❌ Invalid DNA sequence! Only A/T/C/G characters are allowed.")
+        with st.spinner(
+            "Analyzing DNA and MRI..."
+        ):
+
+            result = predict(
+                dna_sequence,
+                image
+            )
+
+        dna_result = result["DNA"]
+        mri_result = result["MRI"]
+        final_result = result["FINAL"]
+
+        st.markdown("---")
+
+        st.subheader(
+            "📊 Multimodal Prediction Results"
+        )
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+
+            st.metric(
+                "🧬 DNA Result",
+                dna_result["Class"],
+                f"{dna_result['Probability']:.2%}"
+            )
+
+        with col2:
+
+            st.metric(
+                "🧠 MRI Result",
+                mri_result["Class"],
+                f"{mri_result['Probability']:.2%}"
+            )
+
+        with col3:
+
+            st.metric(
+                "🎯 Final Result",
+                final_result["Class"],
+                f"{final_result['Probability']:.2%}"
+            )
+
+        st.progress(
+            float(
+                final_result["Probability"]
+            )
+        )
+
+        # =====================================
+        # FINAL DIAGNOSIS
+        # =====================================
+
+        if final_result["Class"] == "Normal":
+
+            st.success(
+                "✅ Final Diagnosis: NORMAL"
+            )
+
+        elif final_result["Class"] == "Intermediate":
+
+            st.warning(
+                "⚠ Final Diagnosis: INTERMEDIATE"
+            )
+
         else:
-            results = safe_predict(dna_input, uploaded)
-            if results:
-                mri_res = results.get("MRI")
-                dna_res = results.get("DNA")
 
-                if mri_res and dna_res:
-                    combined = combine_results(mri_res, dna_res)
-                    if combined:
-                        cls_c, prob_c = combined["Class"], combined["Probability"]
-                        show_pred_block(cls_c, prob_c)
-                        add_history(cls_c, prob_c)
-                else:
-                    st.error("❌ MRI or DNA result missing from predict().")
-    else:
-        st.warning("⚠ Please upload an MRI and paste a DNA sequence before clicking Find Output.")
+            st.error(
+                "🚨 Final Diagnosis: PATHOGENIC"
+            )
 
-# ----- History -----
-if keep_history and st.session_state.history:
-    st.markdown("---")
-    st.subheader("🗂️ Session Prediction History")
-    st.dataframe(st.session_state.history, use_container_width=True)
+        # =====================================
+        # DETAILS
+        # =====================================
 
-st.markdown(
-    "<hr><p style='text-align:center; color:gray;'>© 2025 Huntington's Disease Detection</p>",
-    unsafe_allow_html=True
+        with st.expander(
+            "🔍 Prediction Details"
+        ):
+
+            st.subheader(
+                "DNA Prediction"
+            )
+
+            st.json(
+                dna_result
+            )
+
+            st.subheader(
+                "MRI Prediction"
+            )
+
+            st.json(
+                mri_result
+            )
+
+            st.subheader(
+                "Final Prediction"
+            )
+
+            st.json(
+                final_result
+            )
+
+    except Exception:
+
+        st.error(
+            "❌ Prediction Error"
+        )
+
+        st.code(
+            traceback.format_exc()
+        )
+
+# =====================================
+# FOOTER
+# =====================================
+
+st.markdown("---")
+
+st.caption(
+    "© 2026 Huntington Disease Detection System"
 )
