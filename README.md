@@ -1,4 +1,4 @@
-# Explainable Multimodal Deep Learning for Huntington's Disease Forecasting Using EfficientNet-B3 and Graph Neural Networks
+# Genetic Forecasting of Huntington Disease
 
 ## Overview
 Huntington's Disease (HD) is a hereditary neurodegenerative disorder caused by abnormal CAG repeat expansions in the HTT gene. Early diagnosis is essential for effective disease management and clinical intervention.
