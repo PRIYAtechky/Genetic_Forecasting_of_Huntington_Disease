@@ -50,7 +50,6 @@ This project presents an **Explainable Multimodal Deep Learning Framework** that
 - OpenCV
 - Scikit-learn
 
-
 ## Future Scope
 - Integration of additional biomarkers such as EEG and clinical data
 - Real-time clinical decision support systems
